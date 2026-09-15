@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  /* FutureGrad design tokens v2 — premium SaaS x education-consultancy x
+     AI-intelligence platform. Royal/Electric Blue as the primary
+     confident-intelligence colour, Gold/Amber as the academic-achievement
+     accent, Indigo/Violet + Teal used sparingly for secondary emphasis. */
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Neutrals */
+  --color-ink: #101a33;
+  --color-ink-soft: #4a5578;
+  --color-ink-faint: #8891ac;
+  --color-paper: #f5f6fa;
+  --color-paper-raised: #ffffff;
+  --color-line: #e2e5ee;
+
+  /* Primary — deep navy anchors nav/text, royal blue is the confident
+     brand colour, electric blue is reserved for gradients/highlights. */
+  --color-navy: #101a33;
+  --color-royal: #2547d0;
+  --color-royal-soft: #e7ecfc;
+  --color-electric: #3b6bff;
+
+  /* FutureGrad gold — academic achievement accent, used sparingly. */
+  --color-gold: #c99a2e;
+  --color-gold-soft: #f6ecd2;
+
+  /* Secondary accents — used sparingly, never as a primary surface colour. */
+  --color-violet: #6753d6;
+  --color-violet-soft: #ece8fb;
+  --color-teal: #0f9b8e;
+  --color-teal-soft: #e2f5f2;
+
+  /* Semantic priority colours */
+  --color-hot: #d1432b;
+  --color-hot-soft: #fce7e2;
+  --color-warm: #d1892a;
+  --color-warm-soft: #faedd7;
+  --color-cold: #64748b;
+  --color-cold-soft: #eef1f4;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-royal-soft);
+  color: var(--color-navy);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reusable brand gradient — hero/CTA/highlight surfaces only, never a
+   default background. Deliberately a tight two-stop navy->royal ramp,
+   not a rainbow. */
+.fg-gradient {
+  background-image: linear-gradient(135deg, var(--color-navy) 0%, var(--color-royal) 100%);
+}
+
+.fg-gradient-soft {
+  background-image: linear-gradient(135deg, var(--color-royal-soft) 0%, var(--color-paper-raised) 60%);
+}
+
+/* Subtle focus ring, visible for keyboard users, invisible clutter for mouse users */
+:focus-visible {
+  outline: 2px solid var(--color-royal);
+  outline-offset: 2px;
+}
+
+@keyframes fg-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.fg-pulse {
+  animation: fg-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

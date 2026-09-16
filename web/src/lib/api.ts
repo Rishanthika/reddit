@@ -33,6 +33,8 @@ export const api = {
     classification?: string
     status?: string
     subreddit?: string
+    destination?: string
+    course?: string
     search?: string
     limit?: number
     offset?: number

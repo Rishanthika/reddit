@@ -1,46 +1,65 @@
 @import "tailwindcss";
 
 @theme {
-  /* FutureGrad design tokens v2 — premium SaaS x education-consultancy x
-     AI-intelligence platform. Royal/Electric Blue as the primary
-     confident-intelligence colour, Gold/Amber as the academic-achievement
-     accent, Indigo/Violet + Teal used sparingly for secondary emphasis. */
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  /* FutureGrad design tokens v3 — premium SaaS operations platform.
+     Exact palette from the design brief. Dark-compatible token *names*
+     are defined; dark *mode* itself is intentionally not implemented. */
+  --font-display: "Space Grotesk", "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Neutrals */
-  --color-ink: #101a33;
-  --color-ink-soft: #4a5578;
-  --color-ink-faint: #8891ac;
-  --color-paper: #f5f6fa;
-  --color-paper-raised: #ffffff;
-  --color-line: #e2e5ee;
-
-  /* Primary — deep navy anchors nav/text, royal blue is the confident
-     brand colour, electric blue is reserved for gradients/highlights. */
-  --color-navy: #101a33;
+  /* Primary */
+  --color-navy: #071827;
   --color-royal: #2547d0;
+  --color-electric: #3b82f6;
+  --color-indigo: #4338ca;
+  --color-violet: #7c3aed;
+  --color-purple-glow: #a855f7;
+
+  /* Success */
+  --color-emerald: #16a34a;
+  --color-teal: #0d9488;
+
+  /* Warning */
+  --color-amber: #d97706;
+  --color-gold: #d4a017;
+
+  /* Danger */
+  --color-rose: #e11d48;
+  --color-red: #dc2626;
+
+  /* Neutrals */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-soft: #64748b;
+  --color-muted: #94a3b8;
+
+  /* Semantic priority (mapped onto the palette above) */
+  --color-hot: var(--color-rose);
+  --color-hot-soft: #fde8ee;
+  --color-warm: var(--color-amber);
+  --color-warm-soft: #fbecd5;
+  --color-cold: var(--color-electric);
+  --color-cold-soft: #e6eefd;
+
+  /* Legacy aliases kept so nothing that already shipped breaks while every
+     page is migrated onto the tokens above. */
+  --color-ink: var(--color-text);
+  --color-ink-soft: var(--color-text-soft);
+  --color-ink-faint: var(--color-muted);
+  --color-paper: var(--color-bg);
+  --color-paper-raised: var(--color-surface);
+  --color-line: var(--color-border);
   --color-royal-soft: #e7ecfc;
-  --color-electric: #3b6bff;
+  --color-gold-soft: #f8ecd0;
+  --color-teal-soft: #dcf3ef;
+  --color-violet-soft: #f1e9fd;
 
-  /* FutureGrad gold — academic achievement accent, used sparingly. */
-  --color-gold: #c99a2e;
-  --color-gold-soft: #f6ecd2;
-
-  /* Secondary accents — used sparingly, never as a primary surface colour. */
-  --color-violet: #6753d6;
-  --color-violet-soft: #ece8fb;
-  --color-teal: #0f9b8e;
-  --color-teal-soft: #e2f5f2;
-
-  /* Semantic priority colours */
-  --color-hot: #d1432b;
-  --color-hot-soft: #fce7e2;
-  --color-warm: #d1892a;
-  --color-warm-soft: #faedd7;
-  --color-cold: #64748b;
-  --color-cold-soft: #eef1f4;
+  --radius-card: 16px;
+  --radius-input: 12px;
+  --radius-badge: 10px;
 }
 
 html {
@@ -48,8 +67,8 @@ html {
 }
 
 body {
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -68,18 +87,25 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Reusable brand gradient — hero/CTA/highlight surfaces only, never a
-   default background. Deliberately a tight two-stop navy->royal ramp,
-   not a rainbow. */
+/* Brand gradient — hero/CTA/highlight surfaces only. */
 .fg-gradient {
-  background-image: linear-gradient(135deg, var(--color-navy) 0%, var(--color-royal) 100%);
+  background-image: linear-gradient(135deg, var(--color-navy) 0%, var(--color-royal) 55%, var(--color-indigo) 100%);
+}
+.fg-gradient-ai {
+  background-image: linear-gradient(135deg, var(--color-indigo) 0%, var(--color-violet) 60%, var(--color-purple-glow) 100%);
 }
 
-.fg-gradient-soft {
-  background-image: linear-gradient(135deg, var(--color-royal-soft) 0%, var(--color-paper-raised) 60%);
+.fg-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.fg-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -16px rgba(7, 24, 39, 0.18);
 }
 
-/* Subtle focus ring, visible for keyboard users, invisible clutter for mouse users */
 :focus-visible {
   outline: 2px solid var(--color-royal);
   outline-offset: 2px;
@@ -89,9 +115,24 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
-.fg-pulse {
-  animation: fg-pulse 1.6s ease-in-out infinite;
+.fg-pulse { animation: fg-pulse 1.6s ease-in-out infinite; }
+
+@keyframes fg-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
+.fg-skeleton {
+  background: linear-gradient(90deg, var(--color-border) 25%, #eef2f7 37%, var(--color-border) 63%);
+  background-size: 200% 100%;
+  animation: fg-shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes fg-toast-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.fg-toast { animation: fg-toast-in 180ms ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

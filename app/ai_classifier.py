@@ -198,7 +198,12 @@ class AIClassifier:
     """Wraps the OpenAI API to classify a pre-filtered Reddit post."""
 
     def __init__(self, api_key: str, model: str) -> None:
-        self._client = OpenAI(api_key=api_key)
+        # max_retries=0 disables the SDK's own automatic retry-on-429/5xx
+        # behavior. This is intentional cost control: one Reddit post must
+        # correspond to at most one OpenAI request, and any failure
+        # (including a 429) should surface immediately as
+        # AIClassificationError rather than silently multiplying calls.
+        self._client = OpenAI(api_key=api_key, max_retries=0)
         self._model = model
 
     def classify(self, post: RedditPost) -> LeadAnalysis:

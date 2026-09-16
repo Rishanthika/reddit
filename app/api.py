@@ -19,7 +19,8 @@ Never exposes APIFY_API_TOKEN or OPENAI_API_KEY to any response — see
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import os
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,12 +34,28 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="FutureGrad Reddit Lead Intelligence API")
 
-# Local-first: the Next.js dev server runs on a different port, so CORS
-# needs to allow it. This is a localhost-only internal tool, not a public
-# deployment, so a permissive local origin list is appropriate here.
+# Local dev origins (Vite) + the project's actual deployed Vercel origin
+# (from the repository's own linked deployment — reddit-futuregrad.vercel.app,
+# NOT a guessed URL). An optional FRONTEND_URL env var lets a future/custom
+# domain be added without another code change, without ever needing "*".
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://reddit-futuregrad.vercel.app",
+]
+
+
+def _cors_origins() -> List[str]:
+    origins = list(_DEFAULT_CORS_ORIGINS)
+    extra = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if extra and extra not in origins:
+        origins.append(extra)
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

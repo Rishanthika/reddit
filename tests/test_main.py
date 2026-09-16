@@ -150,19 +150,22 @@ def _seed_existing_lead(db_path, reddit_post_id, **overrides):
 
 def _get_lead_row(db_path, reddit_post_id):
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT * FROM leads WHERE reddit_post_id = ?", (reddit_post_id,)
-    ).fetchone()
-    conn.close()
-    return row
+    try:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM leads WHERE reddit_post_id = ?", (reddit_post_id,)
+        ).fetchone()
+        return row
+    finally:
+        conn.close()
 
 
 def _count_leads(db_path):
     conn = sqlite3.connect(db_path)
-    count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
-    conn.close()
-    return count
+    try:
+        return conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

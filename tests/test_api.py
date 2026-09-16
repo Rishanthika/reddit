@@ -309,3 +309,60 @@ def test_start_scan_conflict_when_already_running(client, monkeypatch):
     monkeypatch.setattr(scan_service, "start_scan", lambda settings, post_limit=None: None)
     resp = client.post("/api/scan", json={})
     assert resp.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# CORS configuration
+# ---------------------------------------------------------------------------
+
+
+def test_cors_allows_local_dev_origin(client):
+    resp = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_cors_allows_the_real_deployed_vercel_origin(client):
+    resp = client.get("/api/health", headers={"Origin": "https://reddit-futuregrad.vercel.app"})
+    assert resp.headers.get("access-control-allow-origin") == "https://reddit-futuregrad.vercel.app"
+
+
+def test_cors_does_not_allow_arbitrary_origins(client):
+    resp = client.get("/api/health", headers={"Origin": "https://some-random-site.example.com"})
+    assert resp.headers.get("access-control-allow-origin") is None
+
+
+def test_cors_never_uses_wildcard():
+    from app.api import _cors_origins
+
+    assert "*" not in _cors_origins()
+
+
+def test_cors_respects_frontend_url_env_var_additively(monkeypatch):
+    from app.api import _cors_origins, _DEFAULT_CORS_ORIGINS
+
+    monkeypatch.setenv("FRONTEND_URL", "https://custom-domain.example.com")
+    origins = _cors_origins()
+
+    assert "https://custom-domain.example.com" in origins
+    # additive, not a replacement -- the defaults (including localhost) remain
+    for default in _DEFAULT_CORS_ORIGINS:
+        assert default in origins
+
+
+def test_cors_frontend_url_trailing_slash_is_normalized(monkeypatch):
+    from app.api import _cors_origins
+
+    monkeypatch.setenv("FRONTEND_URL", "https://custom-domain.example.com/")
+    origins = _cors_origins()
+
+    assert "https://custom-domain.example.com" in origins
+    assert "https://custom-domain.example.com/" not in origins
+
+
+def test_cors_blank_frontend_url_does_not_add_empty_origin(monkeypatch):
+    from app.api import _cors_origins
+
+    monkeypatch.setenv("FRONTEND_URL", "")
+    origins = _cors_origins()
+
+    assert "" not in origins

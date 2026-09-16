@@ -66,7 +66,7 @@ def test_openai_provider_still_returns_ai_classifier():
         )
 
     assert isinstance(classifier, AIClassifier)
-    mock_openai_cls.assert_called_once_with(api_key="fake-key")
+    mock_openai_cls.assert_called_once_with(api_key="fake-key", max_retries=0)
 
 
 def test_default_provider_behavior_is_openai_like():
@@ -1267,6 +1267,15 @@ def test_ai_classifier_truncates_very_long_post_bodies():
     sent_messages = mock_create.call_args.kwargs["messages"]
     user_content = next(m["content"] for m in sent_messages if m["role"] == "user")
     assert len(user_content) < len(huge_body)
+
+
+def test_ai_classifier_disables_sdk_automatic_retries():
+    # Cost control: one Reddit post must correspond to at most one OpenAI
+    # request. If the SDK's own retry-on-429/5xx behavior were left on, a
+    # single rate-limited post could silently generate multiple billed
+    # requests. max_retries=0 is what this file was asked to prove.
+    classifier = AIClassifier(api_key="sk-test-fake-key", model="gpt-4o-mini")
+    assert classifier._client.max_retries == 0
 
 
 def test_create_ai_classifier_never_logs_api_key(caplog):

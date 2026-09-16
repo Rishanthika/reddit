@@ -32,6 +32,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.pool import NullPool
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,21 @@ class Database:
         parent_dir = os.path.dirname(database_path)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
-        self._engine = create_engine(f"sqlite:///{database_path}", future=True)
+        # NullPool means every session opens its own connection and closes
+        # it (at the real OS/file-descriptor level) as soon as the session
+        # is closed, instead of SQLAlchemy's default pool keeping the
+        # underlying sqlite3 connection open and reusable in the
+        # background. On POSIX an open-but-unlinked file is harmless, but
+        # Windows refuses to delete a file with any open handle — a
+        # pooled, never-disposed connection is exactly what caused
+        # `PermissionError: [WinError 32]` when test fixtures tried to
+        # remove their temporary .db files. This is a correctness fix,
+        # not a Windows-only workaround: it's cross-platform and simply
+        # means "close the connection when you're done with it," which is
+        # already what `_session()`'s `finally: session.close()` intends.
+        self._engine = create_engine(
+            f"sqlite:///{database_path}", future=True, poolclass=NullPool
+        )
         self._SessionLocal = sessionmaker(bind=self._engine, expire_on_commit=False)
 
     def init_db(self) -> None:

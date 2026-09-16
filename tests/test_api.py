@@ -40,7 +40,11 @@ def client(db_path, monkeypatch):
 
     from app.api import app  # imported after env vars are set
 
-    return TestClient(app)
+    # Used as a context manager so FastAPI's lifespan (startup/shutdown)
+    # actually runs — that's what calls Database.init_db() once at
+    # startup now, instead of api.py doing it on every request.
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def _seed_lead(db_path, **overrides):
@@ -366,3 +370,124 @@ def test_cors_blank_frontend_url_does_not_add_empty_origin(monkeypatch):
     origins = _cors_origins()
 
     assert "" not in origins
+
+
+# ---------------------------------------------------------------------------
+# Database initialization idempotency (init_db regression: "table leads
+# already exists"). See app/database.py's init_db() docstring.
+# ---------------------------------------------------------------------------
+
+
+def test_init_db_can_be_called_twice_on_the_same_database_without_error(db_path):
+    db = Database(db_path)
+    db.init_db()  # first call: creates the schema
+    db.init_db()  # second call: schema already exists -- must not raise
+
+
+def test_init_db_from_a_second_database_instance_on_same_file_is_safe(db_path):
+    # Simulates api.py's old per-request pattern of constructing a brand
+    # new Database (and therefore a brand new engine) against a file that
+    # already has the schema from an earlier instance/process.
+    Database(db_path).init_db()
+    Database(db_path).init_db()  # different instance, same underlying file
+
+
+def test_init_db_preserves_existing_data_across_repeated_calls(db_path):
+    db = Database(db_path)
+    db.init_db()
+    db.save_lead(
+        reddit_post_id="preserve-me", username="u/test", subreddit="studyabroad",
+        title="Existing lead that must survive re-initialization",
+        post_url="https://reddit.com/x", post_text="",
+        created_at=datetime.now(timezone.utc), ai_is_lead=True,
+        lead_score=90, lead_classification="HOT",
+    )
+
+    # Re-initializing (as would happen on every restart/reload) must never
+    # drop or reset the table.
+    Database(db_path).init_db()
+    Database(db_path).init_db()
+
+    leads = Database(db_path).list_leads()
+    assert leads["total"] == 1
+    assert leads["items"][0]["reddit_post_id"] == "preserve-me"
+
+
+def test_init_db_creates_all_four_tables_not_just_leads(db_path):
+    import sqlite3
+
+    Database(db_path).init_db()
+    conn = sqlite3.connect(db_path)
+    try:
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    finally:
+        conn.close()
+
+    assert {"leads", "lead_notes", "activity_log", "scan_runs"}.issubset(tables)
+
+
+def test_init_db_tolerates_a_concurrent_toctou_style_race(db_path, monkeypatch):
+    """
+    Directly reproduces the reported failure mode: `create_all()` sees the
+    table doesn't exist yet (checkfirst passes), but by the time it issues
+    CREATE TABLE, another caller has already created it -- SQLite then
+    raises `OperationalError: table leads already exists`. init_db() must
+    treat that specific outcome as success, not propagate it as a
+    DatabaseError.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    db = Database(db_path)
+
+    def racy_create_all(engine, checkfirst=True):
+        # Simulate: something else created the table between the
+        # checkfirst query and this call's own CREATE TABLE statement.
+        raise OperationalError(
+            "CREATE TABLE leads (...)", {}, Exception("table leads already exists")
+        )
+
+    monkeypatch.setattr(
+        "app.database.Base.metadata.create_all", racy_create_all
+    )
+
+    db.init_db()  # must not raise DatabaseError despite the simulated race
+
+
+def test_init_db_still_raises_on_a_genuine_unrelated_database_error(db_path, monkeypatch):
+    from app.database import DatabaseError
+    from sqlalchemy.exc import OperationalError
+
+    db = Database(db_path)
+
+    def broken_create_all(engine, checkfirst=True):
+        raise OperationalError("CREATE TABLE leads (...)", {}, Exception("disk I/O error"))
+
+    monkeypatch.setattr("app.database.Base.metadata.create_all", broken_create_all)
+
+    with pytest.raises(DatabaseError):
+        db.init_db()
+
+
+def test_backend_startup_initializes_schema_once_not_per_request(db_path, client):
+    # The `client` fixture enters TestClient as a context manager, which
+    # runs the FastAPI lifespan startup -- confirm that alone is already
+    # enough for the schema to exist, with no per-request init_db() call
+    # needed (app/api.py's _get_database() no longer calls it).
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    try:
+        tables = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    finally:
+        conn.close()
+    assert "leads" in tables
+
+    # And a normal request still works against that already-initialized schema.
+    resp = client.get("/api/dashboard")
+    assert resp.status_code == 200

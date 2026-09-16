@@ -30,7 +30,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -175,9 +175,35 @@ class Database:
         self._SessionLocal = sessionmaker(bind=self._engine, expire_on_commit=False)
 
     def init_db(self) -> None:
-        """Create tables if they do not already exist. Safe to call repeatedly."""
+        """
+        Create every table (Lead, LeadNote, ActivityLog, ScanRun) if it
+        does not already exist. Safe to call repeatedly, including
+        against a database that already has some or all tables from a
+        previous run — this must never drop, reset, or recreate existing
+        data.
+
+        `create_all()`'s own `checkfirst=True` (already the default,
+        kept explicit here for clarity) queries sqlite_master first and
+        skips any table it sees exists. That check-then-create is not
+        atomic, though: under concurrent callers — e.g. several API
+        requests hitting `_get_database()` at once on a fresh process —
+        two callers can both see "doesn't exist yet" and both attempt to
+        create the same table, and whichever commits second raises
+        `OperationalError: table ... already exists`. Since the actual
+        desired end state (the table exists, nothing lost) is reached
+        either way, that specific error is treated as a successful
+        no-op rather than a real failure. Any other database error still
+        raises normally.
+        """
         try:
-            Base.metadata.create_all(self._engine)
+            Base.metadata.create_all(self._engine, checkfirst=True)
+        except OperationalError as exc:
+            if "already exists" not in str(exc).lower():
+                raise DatabaseError(f"Failed to initialize database: {exc}") from exc
+            logger.debug(
+                "init_db(): table(s) already existed (safe to ignore — no data affected): %s",
+                exc,
+            )
         except SQLAlchemyError as exc:
             raise DatabaseError(f"Failed to initialize database: {exc}") from exc
 

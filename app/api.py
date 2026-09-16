@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -32,7 +33,34 @@ from app.database import ALL_LEAD_STATUSES, Database, DatabaseError
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="FutureGrad Reddit Lead Intelligence API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Initialize the schema exactly once, at process startup, instead of on
+    every single request. This is what actually closes the race window
+    that produced "table leads already exists": several near-simultaneous
+    requests right after a cold start (e.g. a dashboard firing off
+    dashboard/leads/activity fetches together) used to each construct
+    their own `Database` and each call `init_db()`, racing each other to
+    create the same tables. `Database.init_db()` is also now safe to call
+    concurrently or repeatedly on its own (see app/database.py) — this
+    startup hook is the primary fix, that's the safety net.
+
+    If configuration isn't ready yet (e.g. a required env var missing),
+    this logs and lets startup continue — `_get_settings()` still reports
+    a clear per-request 500 rather than crashing the whole process at
+    import time.
+    """
+    try:
+        settings = load_settings()
+        Database(settings.database_path).init_db()
+    except ConfigError as exc:
+        logger.warning("Skipping startup database initialization: %s", exc)
+    yield
+
+
+app = FastAPI(title="FutureGrad Reddit Lead Intelligence API", lifespan=lifespan)
 
 # Local dev origins (Vite) + the project's actual deployed Vercel origin
 # (from the repository's own linked deployment — reddit-futuregrad.vercel.app,
@@ -70,10 +98,17 @@ def _get_settings():
 
 
 def _get_database() -> Database:
+    """
+    Returns a Database instance for the request. Schema creation happens
+    once at application startup (see `lifespan` above), not here — this
+    used to call `database.init_db()` on every single request, which is
+    what created the race that produced "table leads already exists"
+    under concurrent requests. `init_db()` is idempotent either way (see
+    app/database.py), but there is no reason to re-run a schema check on
+    every request when startup already guarantees the schema exists.
+    """
     settings = _get_settings()
-    database = Database(settings.database_path)
-    database.init_db()
-    return database
+    return Database(settings.database_path)
 
 
 class StatusUpdate(BaseModel):

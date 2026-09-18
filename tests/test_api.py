@@ -330,6 +330,11 @@ def test_cors_allows_the_real_deployed_vercel_origin(client):
     assert resp.headers.get("access-control-allow-origin") == "https://reddit-futuregrad.vercel.app"
 
 
+def test_cors_allows_the_current_production_vercel_origin(client):
+    resp = client.get("/api/health", headers={"Origin": "https://reddit-sigma-ruddy.vercel.app"})
+    assert resp.headers.get("access-control-allow-origin") == "https://reddit-sigma-ruddy.vercel.app"
+
+
 def test_cors_does_not_allow_arbitrary_origins(client):
     resp = client.get("/api/health", headers={"Origin": "https://some-random-site.example.com"})
     assert resp.headers.get("access-control-allow-origin") is None

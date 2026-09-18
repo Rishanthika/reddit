@@ -62,14 +62,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="FutureGrad Reddit Lead Intelligence API", lifespan=lifespan)
 
-# Local dev origins (Vite) + the project's actual deployed Vercel origin
-# (from the repository's own linked deployment — reddit-futuregrad.vercel.app,
-# NOT a guessed URL). An optional FRONTEND_URL env var lets a future/custom
-# domain be added without another code change, without ever needing "*".
+# Local dev origins (Vite) + the project's deployed Vercel origin(s).
+# An optional FRONTEND_URL env var lets a future/custom domain be added
+# without another code change, without ever needing "*".
 _DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://reddit-futuregrad.vercel.app",
+    "https://reddit-sigma-ruddy.vercel.app",
 ]
 
 
